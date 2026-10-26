@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="theme-color" content="#4f2818" /><title>Ledger House · Overseas Ledger</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" /><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Cardo:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body><main class="app"><section class="scene"><header class="topbar"><img class="seal" src="assets/ui/brand_seal.png" alt="Ledger House"/><strong class="wordmark">Ledger House</strong><i class="divider"></i><span class="submark">Overseas ledger</span><button class="currency">◎ USD ⇄ CNY</button></header><div class="fx-status" id="fxStatus" role="status" aria-live="polite"></div><img class="clerk" src="assets/ui/clerk-behind-desk.png" alt="Ledger House clerk holding an abacus"/><section class="menu" aria-label="Expense categories"><div class="prompt"><h1>What are you<br/>recording today?</h1><p>Choose a category to add an expense.</p></div><button class="tile" data-category="Rent"><img src="assets/ui/icon_rent_cabinet.png" alt=""/><h2>Rent</h2><p>Housing &amp; bills</p></button><button class="tile" data-category="Groceries"><img src="assets/ui/icon_groceries_basket.png" alt=""/><h2>Groceries</h2><p>Food &amp; supplies</p></button><button class="tile travel" data-category="Travel"><img src="assets/ui/icon_travel_carriage.png" alt=""/><h2>Travel</h2><p>Transit &amp; stays</p></button><button class="tile" data-category="Tuition"><img src="assets/ui/icon_tuition_book.png" alt=""/><h2>Tuition</h2><p>Classes &amp; books</p></button><button class="tile wide" data-category="Dining & Social"><img src="assets/ui/icon_dining_steamer.png" alt=""/><h2>Dining &amp; Social</h2><p>Meals, cafés &amp; gatherings</p></button></section><button class="ledger-link" id="ledgerLink">View monthly ledger →</button></section><section class="summary" id="summary" hidden><div class="ledger-toolbar"><button class="ledger-back" id="ledgerBack">← Back to home</button><button class="currency ledger-currency" type="button">USD ⇄ CNY</button></div><h2 tabindex="-1" id="ledgerTitle">Monthly Ledger <small id="summaryCount">0 entries</small></h2><div class="total"><small id="spendingLabel">Recorded spending · USD</small><b><span class="currency-symbol">$</span> <span id="summaryTotal">0.00</span></b><span id="lastRecord">No entries yet</span></div><ul class="records" id="recordList"><li class="empty">Your entries will appear here.</li></ul></section></main>
+<div class="entry" id="entry"><section class="sheet" role="dialog" aria-modal="true" aria-labelledby="entryTitle"><div class="handle"></div><button class="close" aria-label="Close">×</button><h2 id="entryTitle"><span id="entryCategory">Rent</span> <em>Ledger</em></h2><p>Set the abacus, then add this expense.</p><div class="amount"><small id="abacusLabel">ABACUS TOTAL · USD</small><b><span class="currency-symbol">$</span> <span id="amount">0.00</span></b></div><div class="abacus" id="abacus"><div class="beam"></div></div><p class="hint">Tap beads toward the beam: upper = 5, lower = 1.</p><form id="form"><div class="fields"><label class="field">Category<select id="categoryInput"><option>Rent</option><option>Groceries</option><option>Dining &amp; Social</option><option>Travel</option><option>Tuition</option><option>Other</option></select></label><label class="field">Amount<input id="moneyInput" type="number" min="0" max="16665" step="1" value="0" /></label><label class="field wide">Note (optional)<input placeholder="e.g. November rent or grocery run" /></label></div><button class="save">ADD TO LEDGER</button><div class="saved">✓ This entry has been added to your ledger.</div></form></section></div>
+<script>
+  const drawer=document.querySelector('#entry'),categoryTitle=document.querySelector('#entryCategory'),categoryInput=document.querySelector('#categoryInput'),amountEl=document.querySelector('#amount'),moneyInput=document.querySelector('#moneyInput'),abacus=document.querySelector('#abacus'),form=document.querySelector('#form'),totalEl=document.querySelector('#summaryTotal'),countEl=document.querySelector('#summaryCount'),listEl=document.querySelector('#recordList'),lastEl=document.querySelector('#lastRecord');
+  const migration={房租:'Rent',超市:'Groceries',餐饮聚会:'Dining & Social',交通旅行:'Travel',学费学习:'Tuition',日常杂项:'Other',Market:'Groceries'};let upperCounts=[0,0,0,0],lowerCounts=[0,0,0,0],records=JSON.parse(localStorage.getItem('liuzhang-records')||'[]').map(x=>({...x,category:migration[x.category]||x.category}));const icons={Rent:'⌂',Groceries:'♧','Dining & Social':'♨',Travel:'♞',Tuition:'▤',Other:'◎'};
+  let currency=localStorage.getItem('ledger-currency')==='CNY'?'CNY':'USD',fx=null,fxState='loading',fxPending=false;
+  try{const cached=JSON.parse(localStorage.getItem('ledger-fx'));if(cached&&Number.isFinite(cached.rate)&&cached.rate>0&&/^\d{4}-\d{2}-\d{2}$/.test(cached.date))fx=cached}catch{}
+  const symbol=()=>currency==='USD'?'$':'¥';
+  const convertRecord=x=>{const source=x.currency||'USD';return source===currency?x.amount:fx?(currency==='CNY'?x.amount*fx.rate:x.amount/fx.rate):null};
+  const escapeText=value=>String(value).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  function renderCurrency(){
+    document.querySelectorAll('.currency').forEach(button=>{button.textContent=`${currency} ⇄ ${currency==='USD'?'CNY':'USD'}`;button.setAttribute('aria-label',`Current currency ${currency}. Switch to ${currency==='USD'?'CNY':'USD'}`)});
+    document.querySelectorAll('.currency-symbol').forEach(el=>el.textContent=symbol());
+    document.querySelector('#spendingLabel').textContent=`Recorded spending · ${currency}`;
+    document.querySelector('#abacusLabel').textContent=`ABACUS TOTAL · ${currency}`;
+    document.querySelector('#fxStatus').textContent=fx?`1 USD = ${fx.rate.toFixed(4)} CNY · ${fx.date} · ${fxState==='ready'?'Daily reference':fxState==='loading'?'Cached · updating…':'Cached · update unavailable'}`:fxState==='loading'?'Loading exchange rate…':'Rate unavailable · conversion pending';
+  }
+  async function refreshRate(){
+    if(fxPending)return;fxPending=true;fxState='loading';renderCurrency();
+    const controller=new AbortController(),timeout=setTimeout(()=>controller.abort(),10000);
+    try{const response=await fetch('https://api.frankfurter.dev/v2/rate/USD/CNY',{signal:controller.signal});if(!response.ok)throw new Error('Rate unavailable');const data=await response.json();if(!Number.isFinite(data.rate)||data.rate<=0||!/^\d{4}-\d{2}-\d{2}$/.test(data.date))throw new Error('Invalid rate');fx={rate:data.rate,date:data.date};fxState='ready';try{localStorage.setItem('ledger-fx',JSON.stringify(fx))}catch{}}
+    catch{fxState='error'}finally{clearTimeout(timeout);fxPending=false;renderCurrency();renderSummary()}
+  }
+  function renderAbacus(){
+    abacus.querySelectorAll('.rod').forEach((rod,p)=>{
+      rod.querySelectorAll('.upper').forEach((bead,i)=>{
+        const active=i>=2-upperCounts[p];
+        bead.style.top=`${active?56-(1-i)*22:7+i*22}px`;
+        bead.setAttribute('aria-pressed',String(active));
+      });
+      rod.querySelectorAll('.low').forEach((bead,i)=>{
+        const active=i<lowerCounts[p];
+        bead.style.top=active?`${94+i*22}px`:`calc(100% - ${7+(5-i)*22}px)`;
+        bead.setAttribute('aria-pressed',String(active));
+      });
+    });
+    const val=upperCounts.reduce((sum,n,p)=>sum+(n*5+lowerCounts[p])*10**(3-p),0);
+    amountEl.textContent=`${val.toLocaleString('en-US')}.00`;moneyInput.value=val;
+  }
+  function buildAbacus(){
+    ['thousands','hundreds','tens','ones'].forEach((name,p)=>{
+      const rod=document.createElement('div');rod.className='rod';
+      for(let i=0;i<2;i++){
+        const bead=document.createElement('button');bead.type='button';bead.className='bead upper';
+        bead.setAttribute('aria-label',`${name} upper bead ${i+1}`);
+        bead.onclick=()=>{upperCounts[p]=i>=2-upperCounts[p]?1-i:2-i;renderAbacus()};
+        rod.appendChild(bead);
+      }
+      for(let i=0;i<5;i++){
+        const bead=document.createElement('button');bead.type='button';bead.className='bead low';
+        bead.setAttribute('aria-label',`${name} lower bead ${i+1}`);
+        bead.onclick=()=>{lowerCounts[p]=i<lowerCounts[p]?i:i+1;renderAbacus()};
+        rod.appendChild(bead);
+      }
+      const label=document.createElement('span');label.className='place';label.textContent=name;
+      rod.appendChild(label);abacus.appendChild(rod);
+    });renderAbacus();
+  }
+  function renderSummary(){
+    const values=records.map(convertRecord),unavailable=values.some(value=>value===null);
+    totalEl.textContent=unavailable?'—':values.reduce((sum,value)=>sum+value,0).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
+    countEl.textContent=`${records.length} ${records.length===1?'entry':'entries'}`;
+    lastEl.textContent=unavailable?'Exchange rate needed to calculate total':records.length?`Latest: ${records[0].category}`:'No entries yet';
+    listEl.innerHTML=records.length?records.map((x,i)=>{const source=x.currency||'USD',converted=source!==currency,value=values[i];return `<li><i>${icons[x.category]||'◎'}</i><div><b>${escapeText(x.note||x.category)}</b><small>${escapeText(x.category)} · ${escapeText(x.date)}${converted?` · Original ${source} ${x.amount.toFixed(2)}`:''}</small></div><strong>${value===null?'Rate unavailable':`${converted?'≈ ':''}− ${symbol()} ${value.toFixed(2)}`}</strong></li>`}).join(''):'<li class="empty">Your entries will appear here.</li>';
+  }
+  function close(){drawer.classList.remove('show');document.body.style.overflow=''}buildAbacus();renderSummary();document.querySelectorAll('[data-category]').forEach(b=>b.onclick=()=>{categoryTitle.textContent=b.dataset.category;categoryInput.value=b.dataset.category;drawer.classList.add('show');document.body.style.overflow='hidden'});document.querySelector('.close').onclick=close;drawer.onclick=e=>{if(e.target===drawer)close()};moneyInput.oninput=()=>{let remaining=Math.max(0,Math.min(Math.round(Number(moneyInput.value)||0),16665));for(let p=0;p<4;p++){const place=10**(3-p),digit=Math.min(15,Math.floor(remaining/place));remaining-=digit*place;upperCounts[p]=Math.min(2,Math.floor(digit/5));lowerCounts[p]=digit-upperCounts[p]*5}renderAbacus()};form.onsubmit=e=>{e.preventDefault();const amount=Number(moneyInput.value)||0,note=form.querySelector('.wide input').value.trim();if(!amount)return;records.unshift({category:categoryInput.value,amount,currency,note,date:new Date().toLocaleDateString('en-US',{month:'short',day:'numeric'})});localStorage.setItem('liuzhang-records',JSON.stringify(records));renderSummary();form.reset();upperCounts=[0,0,0,0];lowerCounts=[0,0,0,0];renderAbacus();document.querySelector('.saved').classList.add('show');setTimeout(()=>{close()},650)};document.querySelector('#ledgerLink').onclick=()=>{document.querySelector('.scene').hidden=true;document.querySelector('#summary').hidden=false;window.scrollTo(0,0);document.querySelector('#ledgerTitle').focus()};
+  document.querySelector('#ledgerBack').onclick=()=>{document.querySelector('#summary').hidden=true;document.querySelector('.scene').hidden=false;document.querySelector('#ledgerLink').focus()};
+  document.querySelectorAll('.currency').forEach(button=>button.onclick=()=>{currency=currency==='USD'?'CNY':'USD';localStorage.setItem('ledger-currency',currency);renderCurrency();renderSummary();if(fxState==='error')refreshRate()});
+  renderCurrency();refreshRate();setInterval(()=>{if(!document.hidden)refreshRate()},60*60*1000);
+  window.addEventListener('online',refreshRate);
+</script></body></html>
